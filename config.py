@@ -41,5 +41,11 @@ DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
 
+# ---------- 向量模型（可选，用于智能客服的混合检索） ----------
+# DeepSeek 没有向量接口，可以用硅基流动等兼容 OpenAI 的服务（例如 BAAI/bge-m3）。不填则只用 BM25 检索。
+EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY", "")
+EMBEDDING_BASE_URL = os.getenv("EMBEDDING_BASE_URL", "https://api.siliconflow.cn/v1")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3")
+
 # ---------- 飞书群机器人 ----------
 FEISHU_WEBHOOK = os.getenv("FEISHU_WEBHOOK", "")

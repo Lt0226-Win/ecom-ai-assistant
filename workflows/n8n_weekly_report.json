@@ -1,0 +1,68 @@
+{
+  "name": "电商周报：每周一 9 点生成并推送飞书",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {"interval": [{"field": "weeks", "weeksInterval": 1, "triggerAtDay": [1], "triggerAtHour": 9, "triggerAtMinute": 0}]}
+      },
+      "name": "每周一 9:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/report/weekly",
+        "options": {"timeout": 180000}
+      },
+      "name": "调用接口生成周报",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {"number": [{"value1": "={{ $json.unverified_numbers.length }}", "operation": "equal", "value2": 0}]}
+      },
+      "name": "数字核对通过？",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [480, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://open.feishu.cn/open-apis/bot/v2/hook/在这里替换成你的飞书机器人地址",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ msg_type: 'interactive', card: { config: { wide_screen_mode: true }, header: { title: { tag: 'plain_text', content: $json.title }, template: 'grey' }, elements: [ { tag: 'markdown', content: $json.markdown.split('\\n').slice(1).join('\\n').replace(/^#+\\s*(.*)$/gm, '**$1**') } ] } }) }}",
+        "options": {}
+      },
+      "name": "推送到运营群",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, -100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://open.feishu.cn/open-apis/bot/v2/hook/在这里替换成你的飞书机器人地址",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ msg_type: 'text', content: { text: '【周报待审核】' + $json.title + ' 中有数字未通过核对：' + $json.unverified_numbers.join('、') + '。请到看板“自动周报”页人工检查后再发送。' } }) }}",
+        "options": {}
+      },
+      "name": "提醒人工审核",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 100]
+    }
+  ],
+  "connections": {
+    "每周一 9:00": {"main": [[{"node": "调用接口生成周报", "type": "main", "index": 0}]]},
+    "调用接口生成周报": {"main": [[{"node": "数字核对通过？", "type": "main", "index": 0}]]},
+    "数字核对通过？": {"main": [[{"node": "推送到运营群", "type": "main", "index": 0}], [{"node": "提醒人工审核", "type": "main", "index": 0}]]}
+  },
+  "settings": {"timezone": "Asia/Shanghai"}
+}
