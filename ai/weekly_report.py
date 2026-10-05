@@ -17,6 +17,7 @@ import math
 import numbers
 import re
 import sys
+from decimal import ROUND_HALF_UP, Decimal
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -160,8 +161,12 @@ def _allowed_numbers(f: dict) -> dict[int, set[float]]:
     nums: dict[int, set[float]] = {0: set(), 1: set(), 2: set()}
 
     def add(v: float):
+        # Python 的 round 是“银行家舍入 + 浮点误差”（135.55 会变成 135.5），而人和大模型写的是四舍五入（135.6），
+        # 所以同时收录“四舍五入”的写法，否则正确的数字会被误报
+        exact = Decimal(repr(round(v, 8)))
         for nd in (0, 1, 2):
             nums[nd].add(round(v, nd))
+            nums[nd].add(float(exact.quantize(Decimal(1).scaleb(-nd), rounding=ROUND_HALF_UP)))
 
     def walk(x):
         if isinstance(x, dict):

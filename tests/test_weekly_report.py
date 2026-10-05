@@ -35,3 +35,10 @@ def test_generate_falls_back_to_template_without_llm(con):
     rep = weekly_report.generate(con, use_llm=True)     # 测试环境没有配置大模型
     assert rep["source"] == "template"
     assert rep["markdown"].startswith("# 电商经营周报")
+
+
+def test_verify_numbers_accepts_half_up_rounding():
+    """数据是 1.3555（即 135.55%），大模型四舍五入写成 135.6% 是对的，不能误报；写 136.6% 才是错的"""
+    facts = {"change": 1.3555, "other": -0.3755}
+    assert weekly_report.verify_numbers("增长 135.6%，下降 37.6%", facts) == []
+    assert weekly_report.verify_numbers("增长 136.6%", facts) == ["136.6"]
