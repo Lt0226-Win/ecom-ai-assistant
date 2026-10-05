@@ -13,7 +13,7 @@
 |---|---|---|
 | 数据仓库 | 3.5GB CSV → ODS / DWD / DWS / ADS 四层，16 项数据质量自动检查 | 1 亿行全量构建约 30 秒；剔除脏数据 0.06% |
 | 经营分析看板 | 经营总览、用户漏斗、RFM 分层、品类四象限，共 4 页 | 发现“9 天内 61% 的浏览用户完成购买，但每 100 次浏览只有 2.2 次购买”等结论 |
-| AI 问数 | 中文提问 → 大模型写 SQL → 只读执行 → 报错自动修正 → 中文结论 | 23 道标准题离线评测，见 [评测报告](reports/text2sql_eval.md) |
+| AI 问数 | 中文提问 → 大模型写 SQL → 只读执行 → 报错自动修正 → 中文结论 | 开发集 23 道题 95.7%；另有 10 道未参与调优的独立题 10/10（样本小，仅作泛化的初步验证），见 [开发集报告](reports/text2sql_eval.md) 与 [独立题报告](reports/text2sql_holdout.md) |
 | 自动周报 | SQL 算数 + 大模型写分析 + **数字自动核对** + 飞书推送，n8n 每周定时触发 | 随机编造的小数 90% 会被拦下（按数字自己的精度核对），提醒人工审核 |
 | 智能客服 | 店铺规则文档 RAG 问答（标注来源、查不到转人工）+ 工单 8 分类 | 检索 Hit@3 100%，拒答判断 100%（23 题），见 [评测报告](reports/service_eval.md) |
 | 工程质量 | 45 个自动化测试，每次推送由 GitHub Actions 自动运行；依赖版本锁定 | 在合成数据上完整跑通数仓 + 16 项质量检查，覆盖 SQL 安全、超时、并发、额度、接口鉴权 |
@@ -62,7 +62,8 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 python pipeline/build_warehouse.py          # 构建数据仓库 + 质量检查
 streamlit run app/app.py                    # 看板
-python eval/run_text2sql_eval.py            # AI 问数评测
+python eval/run_text2sql_eval.py            # AI 问数评测（23 道标准题）
+python eval/run_text2sql_eval.py --holdout # AI 问数独立题评测（10 道未参与调优的新题，验证泛化）
 python eval/run_service_eval.py --llm       # 智能客服评测
 python ai/weekly_report.py --push           # 生成周报并推送飞书
 uvicorn api.server:app --port 8000          # 接口（给 n8n / Dify 调用，默认只允许本机访问）
@@ -118,5 +119,6 @@ pip install -r requirements-dev.txt && pytest   # 运行全部测试
 - 数据只有 9 天，无法分析月度趋势、长期留存和季节性；RFM 只能用简化的高/低两档。
 - 价格为模拟，金额类结论只代表方法。
 - AI 问数依赖语义层说明，遇到复杂多表问题仍可能出错；下一步可以加入“相似问题 + SQL 示例”检索（few-shot）提高准确率。
+- AI 问数的 10 道独立题（`eval/text2sql_holdout.json`）由作者出题，出题后没有为这些题改过提示词和语义层（`ai/` 目录最后一次改动早于出题提交，可用 git 记录核对）；但只有 10 题，10/10 的统计意义有限（95% 置信区间下限约 69%），其中 1 题靠自动重试修正。后续计划再出第二批更难的题。
 - 智能客服的同义词表和规则分类基线是在评测集上调的，结果偏乐观；需要更多真实工单做独立测试集。
 - 周报数字核对是“在数据里找得到”的检查：编造的数字如果恰好和数据里某个数相同就拦不住；模型自己算的合理派生数（例如两数之差）会被标记，需要人工确认。
