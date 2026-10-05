@@ -12,7 +12,7 @@
 | 模块 | 做了什么 | 关键结果 |
 |---|---|---|
 | 数据仓库 | 3.5GB CSV → ODS / DWD / DWS / ADS 四层，16 项数据质量自动检查 | 1 亿行全量构建约 30 秒；剔除脏数据 0.06% |
-| 经营分析看板 | 经营总览、用户漏斗、RFM 分层、品类四象限，共 4 页 | 发现“9 天内 61% 的浏览用户完成购买，但每 100 次浏览只有 2.2 次购买”等结论 |
+| 经营分析看板 | 套用 shadcn/ui 官方 dashboard-01 模板：经营总览、用户转化、用户分层、品类分析，加上 AI 问数 / 自动周报 / 智能客服，共 7 页 | 发现“9 天内 61% 的浏览用户完成购买，但每 100 次浏览只有 2.2 次购买”等结论 |
 | AI 问数 | 中文提问 → 大模型写 SQL → 只读执行 → 报错自动修正 → 中文结论 | 开发集 23 道题 95.7%；另有 10 道未参与调优的独立题 10/10（样本小，仅作泛化的初步验证），见 [开发集报告](reports/text2sql_eval.md) 与 [独立题报告](reports/text2sql_holdout.md) |
 | 自动周报 | SQL 算数 + 大模型写分析 + **数字自动核对** + 飞书推送，n8n 每周定时触发 | 随机篡改数字 500 次拦下 88.2%；真实的大模型周报里拦住了 2 处金额单位错误（差 10 倍），见 [演示](reports/weekly/guard_demo.md) 与 [人工复核](reports/weekly/review_notes.md) |
 | 智能客服 | 店铺规则文档 RAG 问答（标注来源、查不到转人工）+ 工单 8 分类 | 检索 Hit@3 100%，拒答判断 100%（23 题），见 [评测报告](reports/service_eval.md) |
@@ -26,7 +26,7 @@ flowchart LR
     B -->|清洗 去重 时区| C[DWD<br/>行为明细 / 订单明细]
     C -->|聚合| D[DWS<br/>用户 / 商品 / 品类×天]
     D -->|指标| E[ADS<br/>日指标 漏斗 留存 RFM]
-    E --> F[Streamlit 看板]
+    E --> F[网页看板<br/>React + shadcn/ui]
     E --> G[AI 问数<br/>Text-to-SQL]
     E --> H[自动周报] -->|n8n 定时| I[飞书群]
     J[店铺规则文档] --> K[RAG 检索] --> L[智能客服]
@@ -37,7 +37,7 @@ flowchart LR
 ## 技术栈
 
 - **数据**：DuckDB（列式分析数据库）、SQL（窗口函数、CTE、FILTER 聚合）、Parquet、pandas
-- **可视化**：Streamlit、Plotly
+- **可视化**：React、shadcn/ui（dashboard-01 模板）、Recharts、Tailwind CSS；早期版本为 Streamlit + Plotly（保留在 `app/`）
 - **AI**：DeepSeek（OpenAI 兼容接口）、Text-to-SQL、RAG（BM25 / 可选向量混合检索 + RRF 融合）、结构化输出（JSON）
 - **自动化**：FastAPI、n8n、飞书机器人
 - **工程**：Git、数据质量检查、离线评测集
@@ -53,7 +53,7 @@ flowchart LR
 1. 下载数据集，把 `UserBehavior.csv` 放到 `data/raw/`
 2. 双击 `安装.command`（创建虚拟环境、安装依赖、构建数据仓库）
 3. 打开项目根目录的 `.env`，填写 `DEEPSEEK_API_KEY`（不填也能看分析看板，AI 页面为演示模式）
-4. 双击 `启动看板.command`，浏览器打开 http://localhost:8502
+4. 双击 `启动看板.command`，浏览器打开 http://localhost:8600（旧版 Streamlit 看板：`启动旧版看板.command`，端口 8502）
 
 命令行方式：
 
@@ -61,7 +61,8 @@ flowchart LR
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 python pipeline/build_warehouse.py          # 构建数据仓库 + 质量检查
-streamlit run app/app.py                    # 看板
+uvicorn api.web:app --port 8600             # 看板（网页 + 接口，打开 http://localhost:8600）
+streamlit run app/app.py                    # 旧版 Streamlit 看板（可选）
 python eval/run_text2sql_eval.py            # AI 问数评测（23 道标准题）
 python eval/run_text2sql_eval.py --holdout # AI 问数独立题评测（10 道未参与调优的新题，验证泛化）
 python eval/run_service_eval.py --llm       # 智能客服评测
@@ -93,9 +94,10 @@ pip install -r requirements-dev.txt && pytest   # 运行全部测试
 ```
 ├── pipeline/            数据流水线：构建数仓、质量检查
 ├── sql/                 分层建表 SQL（01 DWD → 05 ADS）
-├── app/                 Streamlit 看板（views/ 下每个文件一页）
+├── web/                 网页看板（React + shadcn/ui，源码在 src/，构建好的 dist/ 已提交）
+├── app/                 旧版 Streamlit 看板（保留作对照）
 ├── ai/                  AI 能力：llm 调用、text2sql、weekly_report、rag、tickets
-├── api/                 FastAPI 接口
+├── api/                 FastAPI：web.py 给网页看板，server.py 给 n8n / Dify
 ├── kb/                  客服知识库文档 + 模拟工单
 ├── eval/                评测集与评测脚本
 ├── tests/               自动化测试（pytest，合成数据，GitHub Actions 自动运行）

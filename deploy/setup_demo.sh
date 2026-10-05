@@ -18,8 +18,9 @@ else
   git clone "$REPO" "$APP_DIR"
 fi
 cd "$APP_DIR"
+[ -f web/dist/index.html ] || { echo "缺少 web/dist：请确认代码已经 git push（里面包含构建好的网页）"; exit 1; }
 
-echo "== 3/5 安装依赖（第一次约 2–3 分钟）=="
+echo "== 3/5 安装依赖（第一次约 2–3 分钟；网页已经构建好放在 web/dist，不需要 Node）=="
 [ -x .venv/bin/python ] || python3 -m venv .venv
 .venv/bin/pip install -q --upgrade pip
 .venv/bin/pip install -q -r requirements.txt
@@ -50,13 +51,14 @@ fi
 echo "== 5/5 设置为后台服务（开机自动启动、崩溃自动重启）=="
 sudo tee /etc/systemd/system/ecom-demo.service >/dev/null <<UNIT
 [Unit]
-Description=ecom-ai-assistant demo (Streamlit)
+Description=ecom-ai-assistant demo (web dashboard + API)
 After=network.target
 
 [Service]
 User=$USER
 WorkingDirectory=$APP_DIR
-ExecStart=$APP_DIR/.venv/bin/streamlit run app/app.py --server.port 8502 --server.address 127.0.0.1 --server.baseUrlPath demo --server.headless true --browser.gatherUsageStats false
+Environment=WEB_BASE_PATH=/demo
+ExecStart=$APP_DIR/.venv/bin/uvicorn api.web:app --host 127.0.0.1 --port 8502
 Restart=always
 RestartSec=5
 
@@ -68,7 +70,7 @@ sudo systemctl enable ecom-demo
 sudo systemctl restart ecom-demo
 
 sleep 5
-if curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8502/demo/_stcore/health | grep -q 200; then
+if curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8502/demo/api/status | grep -q 200; then
   echo ""
   echo "完成！在线演示地址：http://你的网站地址/demo/"
 else
