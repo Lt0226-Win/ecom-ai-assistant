@@ -55,7 +55,10 @@ def _show(ans) -> None:
         fig = _auto_chart(ans.data)
         if fig is not None:
             st.plotly_chart(fig, config=charts.CONFIG, width="stretch")
-        st.dataframe(ans.data, hide_index=True, width="stretch")
+        num_cols = {c: st.column_config.NumberColumn(format="localized")
+                    for c in ans.data.columns if pd.api.types.is_numeric_dtype(ans.data[c])
+                    and not str(c).lower().endswith("id")}
+        st.dataframe(ans.data, hide_index=True, width="stretch", column_config=num_cols)
     if ans.sql:
         with st.expander(f"查看 SQL · {ans.seconds:.1f} 秒 · 尝试 {ans.attempts} 次"):
             if ans.explanation:
