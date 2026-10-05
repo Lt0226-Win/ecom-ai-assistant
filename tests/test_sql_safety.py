@@ -42,3 +42,14 @@ def test_read_only_connection_is_second_line_of_defence(con):
     # 即使安全检查漏掉了，只读连接也写不进去
     with pytest.raises(duckdb.Error):
         con.execute("CREATE TABLE hacked AS SELECT 1")
+
+
+def test_eval_gold_sql_passes_safety_check():
+    """两套评测集的标准答案 SQL 本身也必须是安全的只读查询（防止评测集写错）"""
+    import json
+
+    import config
+    for name in ["text2sql_cases.json", "text2sql_holdout.json"]:
+        for c in json.loads((config.ROOT / "eval" / name).read_text(encoding="utf-8")):
+            if c["gold_sql"]:
+                check_sql(c["gold_sql"])
