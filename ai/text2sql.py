@@ -166,7 +166,7 @@ def ask(con, question: str, history: list[dict] | None = None, summarize: bool =
             ans.summary = llm.chat([{"role": "user", "content": SUMMARY_PROMPT.format(
                 question=question, sql=ans.sql, n=len(ans.data), table=_df_to_text(ans.data))}],
                 temperature=0.3, max_tokens=400)
-    except llm.LLMNotConfigured as e:
+    except (llm.LLMNotConfigured, llm.LLMQuotaExceeded) as e:
         ans.error = str(e)
     except Exception as e:  # noqa: BLE001
         ans.error = f"调用大模型失败：{e}"

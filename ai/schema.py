@@ -108,6 +108,7 @@ BUSINESS_RULES = """
 - 转化率有两种口径：次数口径（订单数 / 浏览次数）和用户口径（付费用户 / 活跃用户）。用户没说清时，默认用户口径，并在说明里写明口径。
 - 复购用户：有 2 天及以上下过单的付费用户（buy_days >= 2）。复购率 = 复购用户 / 付费用户。
 - 品类没有名称，只能用 category_id 表示。
+- 问“某一天的某个小时”时，ads_hourly_behavior 是 9 天平均值，不能用；要用 dwd_order（order_date + order_hour）或 dwd_user_behavior（event_date + event_hour）按条件统计。
 """
 
 
@@ -118,8 +119,11 @@ def schema_text(con=None) -> str:
         for t, c, ty in con.execute(
                 "SELECT table_name, column_name, data_type FROM information_schema.columns").fetchall():
             types[(t, c)] = ty
+    existing = {t for t, _ in types} if types else set(TABLES)
     parts = []
     for t, info in TABLES.items():
+        if t not in existing:      # 在线演示版数据库没有 1 亿行的明细表，就不告诉模型
+            continue
         cols = "\n".join(f"    - {c} {types.get((t, c), '')}：{d}" for c, d in info["cols"].items())
         parts.append(f"表 {t}：{info['desc']}\n{cols}")
     return "\n\n".join(parts)

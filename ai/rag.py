@@ -186,7 +186,7 @@ def answer(question: str, history: list[dict] | None = None, k: int = 3) -> dict
     try:
         out = llm.chat_json(messages, temperature=0.2, max_tokens=500)
         result.update(answer=out.get("answer", ""), need_human=bool(out.get("need_human")))
-    except llm.LLMNotConfigured as e:
+    except (llm.LLMNotConfigured, llm.LLMQuotaExceeded) as e:
         result["error"] = str(e)
     except Exception as e:  # noqa: BLE001
         result["error"] = f"调用大模型失败：{e}"
