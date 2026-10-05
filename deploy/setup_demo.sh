@@ -1,5 +1,5 @@
 #!/bin/bash
-# 在服务器上运行：部署“电商 AI 运营助手”在线演示版（地址：你的网站/demo/）
+# 在服务器上运行：部署“电商 AI 运营助手”在线演示版（地址：你的域名/demo/，例如 https://ltfolio.cn/demo/）
 # 前提：已经把精简数据库 ecom_demo.duckdb 上传到服务器的家目录（~/ecom_demo.duckdb）
 # 用法：bash setup_demo.sh          可以重复运行（代码更新后再运行一次即可）
 set -e
@@ -72,7 +72,7 @@ sudo systemctl restart ecom-demo
 sleep 5
 if curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8502/demo/api/status | grep -q 200; then
   echo ""
-  echo "完成！在线演示地址：http://你的网站地址/demo/"
+  echo "完成！在线演示地址：你的域名/demo/（例如 https://ltfolio.cn/demo/；没绑域名时用 http://服务器IP/demo/）"
 else
   echo "服务没有正常启动，查看日志：sudo journalctl -u ecom-demo -n 50"
 fi
