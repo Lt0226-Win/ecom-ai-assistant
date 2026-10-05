@@ -1,6 +1,5 @@
 #!/bin/bash
 # 双击运行：启动网页看板，浏览器会自动打开 http://localhost:8600
-# （旧版 Streamlit 看板请用 启动旧版看板.command）
 cd "$(dirname "$0")" || exit 1
 if [ ! -x .venv/bin/uvicorn ]; then
   echo "还没有安装，请先运行 安装.command"; read -r -p "按回车键退出…"; exit 1

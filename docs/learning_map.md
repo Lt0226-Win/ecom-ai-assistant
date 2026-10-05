@@ -95,7 +95,7 @@
 ## 节点 4：数据分析与解读
 
 **做了什么**：从数字里得出结论，并识别数据陷阱。
-**对应文件**：`docs/analysis_report.md`、`app/views/` 各页面的“关键发现”
+**对应文件**：`docs/analysis_report.md`、`tools/export_dashboard_data.py`（各页“关键发现”的计算）
 
 | 优先级 | 知识点 | 说明 |
 |---|---|---|
@@ -111,29 +111,29 @@
 2. 如果老板问“转化率是多少”，你怎么回答？
 3. 你给出的 5 条建议里，哪一条最优先？怎么验证效果？
 
-**动手改一处**：给“经营总览”页的“关键发现”加一条你自己的发现（改 `app/views/overview.py` 的 `bullets([...])`）。
+**动手改一处**：给“经营总览”页的“关键发现”加一条你自己的发现（改 `tools/export_dashboard_data.py` 里 `overview()` 的 `findings` 列表，再运行一次 `python tools/export_dashboard_data.py`）。
 
 ---
 
 ## 节点 5：可视化看板
 
-**做了什么**：Streamlit 多页面看板，统一设计风格。
-**对应文件**：`app/app.py`、`app/ui.py`、`app/charts.py`、`app/views/*.py`
+**做了什么**：网页多页面看板（套用 shadcn/ui 的 dashboard-01 模板），统一设计风格。
+**对应文件**：`web/src/app/*.tsx`（各页面和图表）、`tools/export_dashboard_data.py`（导出数据）、`api/web.py`（网页和接口）
 
 | 优先级 | 知识点 | 说明 |
 |---|---|---|
 | P0 | 图表选择 | 趋势用折线、比较用柱状、构成用条形 + 占比、关系用散点 |
 | P0 | Python 基础 | 函数、字典、列表、f-string、import、`if __name__ == "__main__"` |
 | P0 | pandas 基础 | DataFrame、筛选、`groupby`、`sort_values`、`head` |
-| P1 | Streamlit 基本组件 | `st.columns`、`st.selectbox`、`st.plotly_chart`、缓存 `st.cache_data` |
+| P1 | 网页看板怎么拿到数据 | 先把指标导出成 JSON（`web/public/data/`），页面直接读 JSON；AI 页面通过 `/api/...` 接口调用 |
 | P1 | 看板设计原则 | 结论在上、细节在下；一屏一个主题；只用一个纵轴 |
 | P2 | Power BI / Tableau | 很多 JD 写，可以用同一份 ADS 数据做一个 Power BI 版本练手 |
 
 **自测题**
 1. 为什么看板连接数据库要用只读模式？
-2. `st.cache_data` 有什么用？不加会怎样？
+2. 为什么前 4 页读导出的 JSON，而不是每次打开都去查 1 亿行的数据库？
 
-**动手改一处**：在“品类分析”页加一个下拉框，切换四象限的纵轴为“加购率”。
+**动手改一处**：把“经营总览”趋势图默认显示的指标从 GMV 改成订单数（改 `web/src/app/chart-area-interactive.tsx` 里 `useState<Key>("gmv")` 的 `"gmv"`）。
 
 ---
 

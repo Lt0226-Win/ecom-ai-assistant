@@ -3,7 +3,7 @@
 运行：python tools/export_dashboard_data.py
 输出：web/public/data/{overview,conversion,users,category}.json（每加一页，在这里加一个导出函数）
 
-“关键发现”的文字由这里用 SQL 结果自动计算，和 Streamlit 版（app/views/overview.py）口径一致。
+“关键发现”的文字由这里用 SQL 结果自动计算。
 """
 import json
 import sys

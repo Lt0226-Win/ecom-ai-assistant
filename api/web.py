@@ -209,7 +209,7 @@ def build_app() -> FastAPI:
     if not base:
         return site
     root = FastAPI()
-    root.mount(base, site)       # 例如挂在 /demo 下面，和原来 Streamlit 演示版的地址保持一致
+    root.mount(base, site)       # 例如挂在 /demo 下面，保持线上演示地址 /demo/ 不变
     return root
 
 
