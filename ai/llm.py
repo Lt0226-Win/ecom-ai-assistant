@@ -58,8 +58,25 @@ def chat(messages: list[dict], temperature: float = 0.0, json_mode: bool = False
     return resp.choices[0].message.content or ""
 
 
-def chat_json(messages: list[dict], **kw) -> dict:
-    """要求模型返回 JSON，并解析成字典。模型偶尔会在 JSON 外面包一层 ```，这里做兼容。"""
-    text = chat(messages, json_mode=True, **kw)
+def _parse_json(text: str) -> dict:
+    """尽量把模型输出解析成 JSON：先整体解析，不行再截取第一个 { 到最后一个 } 之间的部分"""
+    text = text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+    try:
+        return json.loads(text)
+    except ValueError:
+        pass
     m = re.search(r"\{.*\}", text, re.S)
-    return json.loads(m.group(0) if m else text)
+    if m:
+        return json.loads(m.group(0))
+    raise ValueError(f"模型没有返回合法的 JSON：{text[:100]}")
+
+
+def chat_json(messages: list[dict], **kw) -> dict:
+    """要求模型返回 JSON，并解析成字典。解析失败时提醒模型重新输出一次。"""
+    text = chat(messages, json_mode=True, **kw)
+    try:
+        return _parse_json(text)
+    except ValueError:
+        retry = messages + [{"role": "assistant", "content": text},
+                            {"role": "user", "content": "你的输出不是合法的 JSON，请严格按要求只输出一个 JSON 对象。"}]
+        return _parse_json(chat(retry, json_mode=True, **kw))

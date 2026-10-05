@@ -38,7 +38,7 @@ SYSTEM_PROMPT = """你是一名资深电商数据分析师，负责把业务问�
 4. 比率保留 4 位小数，金额保留 2 位小数（用 round）。
 5. 结果列名用中文别名（例如 AS "付费用户数"），方便业务看懂。
 6. 返回明细时加 LIMIT（不超过 100）；排名类问题要 ORDER BY。
-7. 如果问题和这份数据无关、或数据里没有对应信息（比如城市、性别、商品名称），sql 返回空字符串，并在 explanation 里说明原因。
+7. 如果问题和这份数据无关（比如闲聊、问你是什么模型），或数据里没有对应信息（比如城市、性别、商品名称），sql 返回空字符串，explanation 用一句话礼貌说明原因，并举一个可以问的例子。
 
 ## 输出格式
 只返回 JSON：{{"sql": "...", "explanation": "一句话说明你的思路和使用的口径"}}
@@ -168,6 +168,9 @@ def ask(con, question: str, history: list[dict] | None = None, summarize: bool =
                 temperature=0.3, max_tokens=400)
     except (llm.LLMNotConfigured, llm.LLMQuotaExceeded) as e:
         ans.error = str(e)
+    except ValueError:             # 模型两次都没返回合法 JSON，多半是问题和数据无关
+        ans.summary = ("我是这份电商数据的问数助手，只能回答和数据有关的问题，"
+                       "比如“哪一天的 GMV 最高”“复购率是多少”。请换个问法试试。")
     except Exception as e:  # noqa: BLE001
         ans.error = f"调用大模型失败：{e}"
     ans.seconds = time.time() - t0
