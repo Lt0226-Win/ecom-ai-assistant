@@ -52,6 +52,7 @@ EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3")
 DEMO_MODE = os.getenv("DEMO_MODE", "0") == "1"
 DEMO_DAILY_LIMIT = int(os.getenv("DEMO_DAILY_LIMIT", "0"))   # 每天最多调用大模型多少次，0 = 不限制
 USAGE_FILE = ROOT / "data" / "llm_usage.json"
+PORTFOLIO_URL = os.getenv("PORTFOLIO_URL", "/")   # 演示版里“返回作品集首页”链接的地址
 
 # ---------- 飞书群机器人 ----------
 FEISHU_WEBHOOK = os.getenv("FEISHU_WEBHOOK", "")

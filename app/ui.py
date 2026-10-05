@@ -75,6 +75,15 @@ CSS = f"""
 .side-l {{font-size:11px; letter-spacing:.12em; color:{INK3}; font-weight:600; margin: 4px 0 2px;}}
 .side-m {{font-size:12px; color:{INK3}; line-height:1.8;}}
 
+.tblwrap {{overflow-x:auto; -webkit-overflow-scrolling:touch;}}
+@media (max-width: 700px) {{
+  .stats {{grid-template-columns: repeat(2, 1fr) !important;}}
+  .stat {{min-height: 0; padding: 16px;}}
+  .stat .v {{font-size: 22px;}}
+  .ph {{flex-direction: column; align-items: flex-start; gap: 8px;}}
+  .ph .meta {{text-align: left;}}
+}}
+
 .sqlbox {{background:#fafaf8; border:1px solid {LINE}; border-radius:10px; padding:12px 14px;
           font-family: SFMono-Regular, Menlo, monospace; font-size:12px; color:{INK2}; white-space:pre-wrap;}}
 </style>
@@ -210,4 +219,5 @@ def table(df: pd.DataFrame, spec: list[tuple]) -> None:
                 nd = int(k[-1]) if k[-1].isdigit() else 0
                 tds.append(f'<td class="r">{fmt(v, nd)}</td>')
         rows.append("<tr>" + "".join(tds) + "</tr>")
-    H(f'<table class="tbl"><thead><tr>{head}</tr></thead><tbody>{"".join(rows)}</tbody></table>')
+    H(f'<div class="tblwrap"><table class="tbl"><thead><tr>{head}</tr></thead>'
+      f'<tbody>{"".join(rows)}</tbody></table></div>')
