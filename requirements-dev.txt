@@ -1,0 +1,6 @@
+# 开发和测试用（普通使用不需要安装）
+-r requirements.txt
+pytest==9.1.1
+httpx==0.28.1          # 接口测试（FastAPI TestClient）需要
+# 录制演示（tools/record_demo.py、tools/make_video.py）才需要，另需系统安装 ffmpeg
+playwright==1.56.0

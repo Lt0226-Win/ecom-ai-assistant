@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import os
+import threading
 import re
 import sys
 from datetime import date
@@ -19,6 +21,9 @@ class LLMQuotaExceeded(RuntimeError):
     pass
 
 
+_quota_lock = threading.Lock()   # 看板是多线程的，读-改-写计数文件时要加锁
+
+
 def _check_quota() -> None:
     """在线演示版：每天最多调用 DEMO_DAILY_LIMIT 次大模型，超过就拒绝（防止被人刷 API 费用）"""
     limit = config.DEMO_DAILY_LIMIT
@@ -26,15 +31,18 @@ def _check_quota() -> None:
         return
     today = date.today().isoformat()
     path = config.USAGE_FILE
-    try:
-        usage = json.loads(path.read_text()) if path.exists() else {}
-    except ValueError:
-        usage = {}
-    used = usage.get(today, 0)
-    if used >= limit:
-        raise LLMQuotaExceeded(f"今天的 AI 在线体验次数已用完（每天 {limit} 次），明天再来，或者看项目页的演示视频。")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({today: used + 1}))
+    with _quota_lock:
+        try:
+            usage = json.loads(path.read_text()) if path.exists() else {}
+        except ValueError:
+            usage = {}
+        used = usage.get(today, 0)
+        if used >= limit:
+            raise LLMQuotaExceeded(f"今天的 AI 在线体验次数已用完（每天 {limit} 次），明天再来，或者看项目页的演示视频。")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps({today: used + 1}))
+        os.replace(tmp, path)       # 先写临时文件再替换，写到一半出错也不会把计数文件弄坏
 
 
 def available() -> bool:

@@ -94,7 +94,7 @@ if not llm.available():
         q = st.pills("示例问题", list(gold)[:12], key="demo_q")
         if q:
             ans = text2sql.Answer(question=q, sql=gold[q], explanation="演示模式：标准答案 SQL", attempts=1)
-            ans.data = text2sql.run_sql(_con(), gold[q])
+            ans.data = text2sql.run_sql(_con().cursor(), gold[q])
             card_title(q, "")
             _show(ans)
     st.stop()
@@ -125,6 +125,6 @@ if question:
         st.write(question)
     with st.chat_message("assistant"):
         with st.spinner("AI 正在写 SQL 并查询…"):
-            ans = text2sql.ask(_con(), question, history=_history())
+            ans = text2sql.ask(_con().cursor(), question, history=_history())
         _show(ans)
     st.session_state.chat.append({"q": question, "ans": ans})

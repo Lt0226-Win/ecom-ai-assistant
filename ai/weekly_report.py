@@ -154,9 +154,14 @@ def template_report(f: dict) -> str:
 > 金额基于模拟价格。本周报由模板自动生成。"""
 
 
-def _allowed_numbers(f: dict) -> set[float]:
-    """把数据里所有数字按常见写法展开（原值、百分比、万），用来核对文中的数字"""
-    nums: set[float] = set()
+def _allowed_numbers(f: dict) -> dict[int, set[float]]:
+    """把数据里所有数字按常见写法展开（原值、百分比、万），按小数位数分别保存：
+    {0: 取整后的集合, 1: 保留 1 位小数的集合, 2: 保留 2 位小数的集合}，用来核对文中的数字。"""
+    nums: dict[int, set[float]] = {0: set(), 1: set(), 2: set()}
+
+    def add(v: float):
+        for nd in (0, 1, 2):
+            nums[nd].add(round(v, nd))
 
     def walk(x):
         if isinstance(x, dict):
@@ -169,25 +174,28 @@ def _allowed_numbers(f: dict) -> set[float]:
             x = float(x)
             if math.isnan(x):
                 return
-            for v in (x, x * 100, x / 1e4, abs(x), abs(x) * 100, abs(x) / 1e4):
-                nums.add(round(v, 1))
-                nums.add(round(v))
+            for v in (x, x * 100, x / 1e4):
+                add(abs(v))
         elif isinstance(x, str):
             for m in re.findall(r"\d+(?:\.\d+)?", x):
-                nums.add(round(float(m), 1))
+                add(float(m))
     walk(f)
     return nums
 
 
 def verify_numbers(text: str, f: dict) -> list[str]:
-    """找出文中“数据里查不到”的数字（可能是模型编的或自己算的）"""
+    """找出文中“数据里查不到”的数字（可能是模型编的或自己算的）。
+
+    按文中数字自己的精度核对：写 87.3 就必须能在数据里找到四舍五入到 1 位小数等于 87.3 的值，
+    不能因为数据里有个 87 就放过（旧版就是这样，随机编造的小数有一半能混过去）。"""
     allowed = _allowed_numbers(f)
     suspicious = []
-    for m in re.finditer(r"(?<![\w.])(\d+(?:,\d{3})*(?:\.\d+)?)", text):
+    for m in re.finditer(r"(?<![\w.])(\d+(?:,\d{3})*(?:\.(\d+))?)", text):
         v = float(m.group(1).replace(",", ""))
-        if v < 10 and v == int(v):      # 1、2、3 这类序号/小整数不检查
+        nd = min(len(m.group(2) or ""), 2)
+        if nd == 0 and v < 10:           # 1、2、3 这类序号/小整数不检查
             continue
-        if round(v, 1) not in allowed and round(v) not in allowed:
+        if round(v, nd) not in allowed[nd]:
             suspicious.append(m.group(1))
     return sorted(set(suspicious), key=suspicious.index)
 

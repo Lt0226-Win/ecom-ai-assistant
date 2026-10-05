@@ -1,3 +1,4 @@
+# 项目最早的一步：第一次用 DuckDB 打开 1 亿行原始 CSV，看数据长什么样（学习记录，不参与项目运行）
 import duckdb
 
 data = duckdb.read_csv(

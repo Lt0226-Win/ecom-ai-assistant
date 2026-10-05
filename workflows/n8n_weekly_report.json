@@ -14,6 +14,8 @@
       "parameters": {
         "method": "POST",
         "url": "http://host.docker.internal:8000/report/weekly",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "X-API-Token", "value": "在这里填 .env 里的 API_TOKEN"}]},
         "options": {"timeout": 180000}
       },
       "name": "调用接口生成周报",

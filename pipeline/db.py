@@ -24,3 +24,12 @@ def connect(read_only: bool = False, db_path=None) -> duckdb.DuckDBPyConnection:
     con.execute(f"SET temp_directory='{config.DUCKDB_TEMP_DIR}'")
     con.execute("SET preserve_insertion_order=false")
     return con
+
+
+def new_cursor(con: duckdb.DuckDBPyConnection) -> duckdb.DuckDBPyConnection:
+    """从共享连接派生一个独立游标。
+
+    DuckDB 的同一个连接对象不能被多个线程同时使用；看板和接口都是多线程的，
+    所以每次查询都用 con.cursor() 派生一个新游标：它们共享同一个数据库，但互不干扰，
+    超时中断（interrupt）也只影响自己这一个游标。"""
+    return con.cursor()

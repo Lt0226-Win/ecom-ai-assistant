@@ -22,7 +22,7 @@ use_llm = c1.toggle("用大模型写分析", value=llm.available(), disabled=not
                     help="关闭时用固定模板生成（不调用大模型）")
 if c2.button("生成本周周报", type="primary", width="stretch"):
     with st.spinner("正在计算指标并生成周报…"):
-        rep = weekly_report.generate(_con(), use_llm=use_llm)
+        rep = weekly_report.generate(_con().cursor(), use_llm=use_llm)
         weekly_report.save(rep)
         st.session_state["weekly"] = rep
 
