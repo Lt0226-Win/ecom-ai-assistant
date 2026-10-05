@@ -1,4 +1,4 @@
-"""图表（plotly）：统一的极简风格，和 A 股雷达系统一致。
+"""图表（plotly）：统一的极简风格，和作品网站同一套视觉。
 
 规则：不在图内放标题（标题放在卡片上）；只用一个纵轴；网格线很淡；
 主数据用近黑色，对比数据用浅灰。
@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 
 from app.ui import INK, INK3, LINE, LINE2, NEUTRAL
 
-FONT = "-apple-system, BlinkMacSystemFont, PingFang SC, Helvetica Neue, sans-serif"
+FONT = "Inter, -apple-system, BlinkMacSystemFont, PingFang SC, Microsoft YaHei, sans-serif"
 CONFIG = {"displayModeBar": False}
 
 

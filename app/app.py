@@ -39,7 +39,7 @@ nav = st.navigation(pages)
 ui.setup_page()
 if config.DEMO_MODE:
     # 在线演示版：每页顶部放一个返回作品集首页的链接（手机上侧边栏默认收起，所以放在正文里）
-    ui.H(f'<a href="{config.PORTFOLIO_URL}" target="_self" style="font-size:13px;color:#8e8d88;'
+    ui.H(f'<a href="{config.PORTFOLIO_URL}" target="_self" style="font-size:13px;color:#8e8e93;'
          f'text-decoration:none">← 返回作品集首页</a>')
 with st.sidebar:
     ui.H('<div class="side-l">数据说明</div>')

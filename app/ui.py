@@ -1,4 +1,4 @@
-"""界面设计系统（沿用 A 股雷达系统的风格）：配色、排版、组件。
+"""界面设计系统（和作品网站同一套视觉）：配色、排版、组件。
 
 设计原则：
 - 克制：一个主色（近黑）+ 红/绿两个语义色（红 = 上升，绿 = 下降），其余全部是灰阶。
@@ -13,38 +13,43 @@ import pandas as pd
 import streamlit as st
 
 # ---------------------------------------------------------------- 设计令牌
-INK, INK2, INK3 = "#1d1d1f", "#5f5e5a", "#8e8d88"
-LINE, LINE2, CARD = "#e6e5e1", "#f0efeb", "#ffffff"
-UP, DOWN, FLAT = "#d9363e", "#15935a", "#8e8d88"
-NEUTRAL = "#c9c8c3"
+INK, INK2, INK3 = "#0d0d0d", "#5c5c63", "#8e8e93"
+LINE, LINE2, CARD = "#e7e7ea", "#f1f1f3", "#ffffff"
+UP, DOWN, FLAT = "#d9363e", "#15935a", "#8e8e93"
+NEUTRAL = "#d1d1d6"
 
 CSS = f"""
 <style>
-.block-container {{max-width: 1240px; padding-top: 2.6rem; padding-bottom: 5rem;}}
+.block-container {{max-width: 1240px; padding-top: 3rem; padding-bottom: 5rem;}}
+body, .stApp {{-webkit-font-smoothing: antialiased; font-feature-settings: "cv11", "ss01";}}
+[data-testid="stSidebarNav"] a span {{font-size: 13.5px;}}
 [data-testid="stHeader"] {{background: transparent;}}
 [data-testid="stSidebarNavSeparator"] {{margin: .6rem 0;}}
 
-[class*="st-key-card"] {{background: {CARD}; border-radius: 16px !important; padding: 20px 22px !important;}}
+[class*="st-key-card"] {{background: {CARD}; border-radius: 16px !important; padding: 22px 24px !important;
+  border-color: {LINE} !important; box-shadow: 0 1px 2px rgba(13,13,13,.03);}}
 
 .ph {{display:flex; justify-content:space-between; align-items:flex-end; gap:24px; margin: 0 0 6px;}}
-.ph .eyebrow {{font-size:11px; letter-spacing:.12em; color:{INK3}; font-weight:600; margin-bottom:8px;}}
-.ph h1 {{font-size:28px; line-height:1.15; font-weight:650; letter-spacing:-.02em; margin:0; padding:0; color:{INK};}}
-.ph .sub {{font-size:13px; color:{INK2}; margin-top:8px; max-width:760px; line-height:1.6;}}
+.ph .eyebrow {{font-size:12px; letter-spacing:.01em; color:{INK3}; font-weight:500; margin-bottom:10px;}}
+.ph h1 {{font-size:32px; line-height:1.15; font-weight:600; letter-spacing:-.03em; margin:0; padding:0; color:{INK};}}
+.ph .sub {{font-size:14px; color:{INK2}; margin-top:10px; max-width:760px; line-height:1.65;}}
 .ph .meta {{font-size:12px; color:{INK3}; text-align:right; white-space:nowrap; line-height:1.9;}}
 
 .sec {{display:flex; justify-content:space-between; align-items:baseline; margin: 22px 0 2px;}}
-.sec .t {{font-size:15px; font-weight:600; color:{INK}; letter-spacing:-.01em;}}
+.sec .t {{font-size:16px; font-weight:600; color:{INK}; letter-spacing:-.015em;}}
 .sec .c {{font-size:12px; color:{INK3};}}
 .ct {{font-size:13px; font-weight:600; color:{INK}; margin-bottom:12px; display:flex; justify-content:space-between; gap:12px;}}
 .ct span {{font-weight:400; color:{INK3}; font-size:12px; text-align:right;}}
 
-.tag {{display:inline-block; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:600;
-       color:{INK2}; background:#efeeea; vertical-align:middle;}}
+.tag {{display:inline-block; padding:2px 9px; border-radius:999px; font-size:11px; font-weight:500;
+       color:{INK2}; background:#f1f1f3; vertical-align:middle;}}
 
-.stats {{display:grid; gap:1px; background:{LINE}; border:1px solid {LINE}; border-radius:16px; overflow:hidden;}}
+.stats {{display:grid; gap:1px; background:{LINE}; border:1px solid {LINE}; border-radius:16px; overflow:hidden;
+  box-shadow: 0 1px 2px rgba(13,13,13,.03);}}
 .stat {{background:{CARD}; padding:20px 22px; min-height:124px; box-sizing:border-box;}}
 .stat .l {{font-size:12px; color:{INK3};}}
-.stat .v {{font-size:26px; font-weight:600; letter-spacing:-.02em; margin-top:8px; color:{INK}; line-height:1.15;}}
+.stat .v {{font-size:30px; font-weight:500; letter-spacing:-.04em; margin-top:8px; color:{INK}; line-height:1.15;
+  font-variant-numeric: tabular-nums;}}
 .stat .v small {{font-size:13px; font-weight:500; color:{INK3}; margin-left:3px;}}
 .stat .s {{font-size:12px; color:{INK3}; margin-top:6px;}}
 
@@ -57,7 +62,7 @@ CSS = f"""
 .tbl .m {{color:{INK3};}}
 .tbl td:first-child, .tbl th:first-child {{padding-left:0;}}
 .tbl td:last-child, .tbl th:last-child {{padding-right:0;}}
-.bar {{display:inline-block; width:56px; height:4px; border-radius:2px; background:{LINE2}; vertical-align:middle; margin-right:8px;}}
+.bar {{display:inline-block; width:56px; height:4px; border-radius:2px; background:{LINE}; vertical-align:middle; margin-right:8px;}}
 .bar b {{display:block; height:4px; border-radius:2px; background:{INK};}}
 .up, .tbl td.up {{color:{UP};}} .down, .tbl td.down {{color:{DOWN};}} .muted, .tbl td.muted {{color:{INK3};}}
 
@@ -67,12 +72,12 @@ CSS = f"""
 .reasons li:last-child {{border-bottom:none;}}
 .reasons li b {{color:{INK}; font-weight:600;}}
 
-.plan {{border:1px dashed #d3d2cd; border-radius:14px; padding:16px 20px;}}
+.plan {{border:1px dashed #d1d1d6; border-radius:16px; padding:18px 22px; background:{CARD};}}
 .plan .h {{display:flex; align-items:center; gap:10px; font-size:13px; font-weight:600; color:{INK};}}
 .plan ul {{margin:10px 0 0 0; padding-left:18px;}}
 .plan li {{font-size:12.5px; color:{INK2}; line-height:1.9;}}
 
-.side-l {{font-size:11px; letter-spacing:.12em; color:{INK3}; font-weight:600; margin: 4px 0 2px;}}
+.side-l {{font-size:12px; color:{INK3}; font-weight:500; margin: 4px 0 4px;}}
 .side-m {{font-size:12px; color:{INK3}; line-height:1.8;}}
 
 .tblwrap {{overflow-x:auto; -webkit-overflow-scrolling:touch;}}
@@ -84,8 +89,8 @@ CSS = f"""
   .ph .meta {{text-align: left;}}
 }}
 
-.sqlbox {{background:#fafaf8; border:1px solid {LINE}; border-radius:10px; padding:12px 14px;
-          font-family: SFMono-Regular, Menlo, monospace; font-size:12px; color:{INK2}; white-space:pre-wrap;}}
+.sqlbox {{background:#f7f7f8; border:0; border-radius:12px; padding:14px 16px;
+          font-family: "SF Mono", ui-monospace, Menlo, monospace; font-size:12px; line-height:1.7; color:{INK2}; white-space:pre-wrap;}}
 </style>
 """
 

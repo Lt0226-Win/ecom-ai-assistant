@@ -50,7 +50,7 @@ def _show(ans) -> None:
     if ans.error:
         st.error(ans.error)
     if ans.summary:
-        H(f'<div style="font-size:14px;line-height:1.8;color:#1d1d1f">{esc(ans.summary)}</div>')
+        H(f'<div style="font-size:14px;line-height:1.8;color:#0d0d0d">{esc(ans.summary)}</div>')
     if ans.data is not None and not ans.data.empty:
         fig = _auto_chart(ans.data)
         if fig is not None:
