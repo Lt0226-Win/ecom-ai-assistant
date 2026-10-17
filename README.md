@@ -2,25 +2,58 @@
 
 [![tests](https://github.com/Lt0226-Win/ecom-ai-assistant/actions/workflows/tests.yml/badge.svg)](https://github.com/Lt0226-Win/ecom-ai-assistant/actions/workflows/tests.yml)
 
-> 基于 **1 亿条淘宝用户行为数据**，从数据清洗、数仓分层、经营分析看板，到 **AI 问数、自动周报、智能客服** 的完整项目。
-> 目标：用数据回答“用户在哪里流失、谁是核心用户、哪些品类值得优化”，再用大模型把查数、写报告、答客服这些重复工作自动化。
+**一句话：基于 1 亿条淘宝用户行为数据搭建数据仓库和经营看板，再用大模型把“查数据、写周报、答客服”这三件重复工作自动化。**
 
 **在线体验：[ltfolio.cn/demo](https://ltfolio.cn/demo/)**（AI 功能每天限 100 次调用）　|　作品集：[ltfolio.cn](https://ltfolio.cn)
 
 ![看板截图](docs/images/overview.png)
 
-## 项目亮点
+## 解决什么问题
 
-| 模块 | 做了什么 | 关键结果 |
-|---|---|---|
-| 数据仓库 | 3.5GB CSV → ODS / DWD / DWS / ADS 四层，16 项数据质量自动检查 | 1 亿行全量构建约 30 秒；剔除脏数据 0.06% |
-| 经营分析看板 | 套用 shadcn/ui 官方 dashboard-01 模板：经营总览、用户转化、用户分层、品类分析，加上 AI 问数 / 自动周报 / 智能客服，共 7 页 | 发现“9 天内 61% 的浏览用户完成购买，但每 100 次浏览只有 2.2 次购买”等结论 |
-| AI 问数 | 中文提问 → 大模型写 SQL → 只读执行 → 报错自动修正 → 中文结论 | 开发集 23 道题 95.7%；另有 10 道未参与调优的独立题 10/10（样本小，仅作泛化的初步验证），见 [开发集报告](reports/text2sql_eval.md) 与 [独立题报告](reports/text2sql_holdout.md) |
-| 自动周报 | SQL 算数 + 大模型写分析 + **数字自动核对** + 飞书推送，n8n 每周定时触发 | 随机篡改数字 500 次拦下 88.2%；真实的大模型周报里拦住了 2 处金额单位错误（差 10 倍），见 [演示](reports/weekly/guard_demo.md) 与 [人工复核](reports/weekly/review_notes.md) |
-| 智能客服 | 店铺规则文档 RAG 问答（标注来源、查不到转人工）+ 工单 8 分类 | 检索 Hit@3 100%，拒答判断 100%（23 题），见 [评测报告](reports/service_eval.md) |
-| 工程质量 | 54 个自动化测试，每次推送由 GitHub Actions 自动运行；依赖版本锁定 | 在合成数据上完整跑通数仓 + 16 项质量检查，覆盖 SQL 安全、超时、并发、额度、接口鉴权 |
+电商运营每天要面对三类问题：
 
-## 系统架构
+1. **看不清**：用户在哪一步流失？谁是核心用户？哪些品类值得优化？原始日志有 1 亿行，没法直接看。
+2. **查数慢**：每个临时问题都要找数据同学写 SQL，来回沟通一次就是半天。
+3. **重复劳动多**：每周手写经营周报；客服反复回答“退款多久到账”这类有标准答案的问题。
+
+本项目的做法：先把原始数据清洗成分层数仓、做成看板回答第 1 类问题；再用大模型做 AI 问数、自动周报、智能客服，解决第 2、3 类问题。所有 AI 功能都带“防出错”的设计（SQL 只读检查、周报数字自动核对、客服查不到就转人工），并有离线评测集量化效果。
+
+## 四个功能
+
+### 1. 经营分析看板
+
+- 网页看板基于 shadcn/ui 官方 `dashboard-01` 模板，包含**经营总览、用户转化、用户分层（RFM）、品类分析** 4 个分析页，以及下面 3 个 AI 功能页。
+- 数据来自 DuckDB 数仓：3.5GB CSV → ODS / DWD / DWS / ADS 四层，16 项数据质量自动检查，1 亿行全量构建约 30 秒。
+- 典型结论：9 天内 61% 的浏览用户完成购买，但每 100 次浏览只有 2.2 次购买；重要价值客户占付费用户 28.7%，贡献 56.9% 的 GMV。完整结论见 [分析报告](docs/analysis_report.md)。
+
+### 2. AI 问数（Text-to-SQL）
+
+- 用中文提问 → 大模型根据语义层说明写 SQL → **只读安全检查后执行** → 报错时把错误发回模型自动修正（最多重试 2 次）→ 用中文总结结论。
+- 安全措施：只放行单条 `SELECT` / `WITH` 查询，只读连接，查询超时自动中断，最多返回 500 行。
+- 效果：开发集 23 道题准确率 95.7%；另有 10 道未参与调优的独立题 10/10（样本较小，仅作初步验证）。见 [开发集报告](reports/text2sql_eval.md)、[独立题报告](reports/text2sql_holdout.md)。
+
+### 3. 自动周报
+
+- **SQL 负责算数，大模型只负责写分析**，生成后自动把文中每个数字和 SQL 结果比对，对不上的标出来，防止模型编数字。
+- 可推送到飞书群；`workflows/` 里的 n8n 工作流可每周定时触发；没有 API Key 或调用失败时退回模板生成。
+- 效果：随机篡改数字 500 次拦下 88.2%；在真实的大模型周报里拦住了 2 处金额单位错误（差 10 倍）。见 [核对演示](reports/weekly/guard_demo.md)、[人工复核](reports/weekly/review_notes.md)。
+
+### 4. 智能客服
+
+- **规则问答（RAG）**：基于店铺规则文档（`kb/docs/`）检索后回答，标注引用来源；知识库里查不到就提示转人工。检索默认用 BM25，配置向量模型后自动切换为“关键词 + 向量”混合检索（RRF 融合）。
+- **工单分类**：把顾客消息分到物流查询、退换货、退款进度、商品质量、发票、优惠价保、账户支付、其他咨询 8 类，同时给出紧急程度、情绪和摘要；提供规则法和大模型法两种方式对比。
+- 效果：检索 Hit@3 100%，拒答判断 100%（23 题）。见 [评测报告](reports/service_eval.md)。
+
+## 技术栈
+
+| 方向 | 技术 |
+|---|---|
+| 数据 | DuckDB、SQL（窗口函数、CTE、FILTER 聚合）、Parquet、pandas |
+| 前端看板 | React 19、Vite、shadcn/ui（dashboard-01）、Tailwind CSS 4、Recharts |
+| 后端接口 | FastAPI、uvicorn |
+| AI | DeepSeek（OpenAI 兼容接口）、Text-to-SQL、RAG（rank-bm25 / 可选 BAAI/bge-m3 向量检索）、结构化 JSON 输出 |
+| 自动化 | n8n 定时工作流、飞书群机器人 |
+| 工程 | pytest + GitHub Actions、合成数据测试、离线评测集、依赖版本锁定 |
 
 ```mermaid
 flowchart LR
@@ -33,97 +66,77 @@ flowchart LR
     E --> H[自动周报] -->|n8n 定时| I[飞书群]
     J[店铺规则文档] --> K[RAG 检索] --> L[智能客服]
     G & H & L --> M[DeepSeek 大模型]
-    N[FastAPI 接口] --- G & H & L
 ```
-
-## 技术栈
-
-- **数据**：DuckDB（列式分析数据库）、SQL（窗口函数、CTE、FILTER 聚合）、Parquet、pandas
-- **可视化**：React、shadcn/ui（dashboard-01 模板）、Recharts、Tailwind CSS
-- **AI**：DeepSeek（OpenAI 兼容接口）、Text-to-SQL、RAG（BM25 / 可选向量混合检索 + RRF 融合）、结构化输出（JSON）
-- **自动化**：FastAPI、n8n、飞书机器人
-- **工程**：Git、数据质量检查、离线评测集
 
 ## 数据说明
 
 - 来源：[阿里天池 · 淘宝用户购物行为数据集](https://tianchi.aliyun.com/dataset/649)，2017-11-25 至 12-03，约 98.8 万用户、1 亿条行为（浏览、加购、收藏、购买）。
-- **原始数据没有价格**。为了演示完整的指标体系，项目给每个商品生成了可复现的**模拟价格**（规则见 `sql/02_dim_item.sql`），所有金额类指标仅用于演示分析方法。
-- 智能客服的知识库和 60 条工单是为演示编写的**虚构店铺规则和模拟工单**。
+- **原始数据没有价格**，项目给每个商品生成了可复现的**模拟价格**（规则见 `sql/02_dim_item.sql`），金额类指标仅用于演示分析方法。
+- 客服知识库和 60 条工单是为演示编写的**虚构店铺规则和模拟工单**。
 
-## 快速开始（Mac）
+## 如何本地运行
 
-1. 下载数据集，把 `UserBehavior.csv` 放到 `data/raw/`
-2. 双击 `安装.command`（创建虚拟环境、安装依赖、构建数据仓库）
+**环境要求**：Python 3.12；修改前端页面才需要 Node 20+（构建好的网页 `web/dist` 已提交，只运行不需要装 Node）。
+
+### 方式一：Mac 双击运行
+
+1. 从天池下载数据集，把 `UserBehavior.csv` 放到 `data/raw/`
+2. 双击 `安装.command`：创建虚拟环境、安装依赖、生成 `.env`、构建数据仓库（约 1 分钟）
 3. 打开项目根目录的 `.env`，填写 `DEEPSEEK_API_KEY`（不填也能看分析看板，AI 页面为演示模式）
-4. 双击 `启动看板.command`，浏览器打开 http://localhost:8600
+4. 双击 `启动看板.command`，浏览器自动打开 http://localhost:8600
 
-命令行方式：
+### 方式二：命令行
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python pipeline/build_warehouse.py          # 构建数据仓库 + 质量检查
-uvicorn api.web:app --port 8600             # 看板（网页 + 接口，打开 http://localhost:8600）
-python eval/run_text2sql_eval.py            # AI 问数评测（23 道标准题）
-python eval/run_text2sql_eval.py --holdout # AI 问数独立题评测（10 道未参与调优的新题，验证泛化）
-python eval/run_service_eval.py --llm       # 智能客服评测
-python ai/weekly_report.py --push           # 生成周报并推送飞书
-python eval/run_weekly_guard_demo.py --reuse # 周报数字核对演示（随机篡改 500 次看拦截率；--reuse 复用已存档的大模型周报）
-python pipeline/build_demo_db.py            # 生成精简演示数据库 ecom_demo.duckdb（在线演示用）
-bash deploy/setup_demo.sh                   # 在服务器上部署在线演示（见脚本开头说明）
-uvicorn api.server:app --port 8000          # 接口（给 n8n / Dify 调用，默认只允许本机访问）
-pip install -r requirements-dev.txt && pytest   # 运行全部测试
+cp .env.example .env                  # 填写 DEEPSEEK_API_KEY，其他配置项都是选填
+python pipeline/build_warehouse.py    # 构建数据仓库 + 16 项质量检查
+uvicorn api.web:app --port 8600       # 启动看板（网页 + 接口），打开 http://localhost:8600
 ```
 
-## 测试与安全
+`.env` 主要配置项（完整说明见 `.env.example`）：
 
-`pytest` 会在临时目录生成一份约 1.8 万行的合成数据（格式、时间范围、脏数据类型与真实数据一致），
-在上面完整跑一遍数仓构建，再测试各模块，几秒钟跑完，不需要下载 3.5GB 的原始数据。
-
-| 测试内容 | 验证什么 |
+| 配置 | 作用 |
 |---|---|
-| 数仓 | 16 项数据质量检查全部通过；越界时间、非法行为、重复行被清洗掉 |
-| SQL 安全 | 只放行一条 SELECT / WITH 查询；DROP、多语句、读文件、读环境变量等 14 种写法全部拦截；即使漏检，只读连接也写不进去 |
-| SQL 执行 | 最多返回 500 行；超时自动中断；8 个线程同时查询共享连接，被中断的不影响其他查询 |
-| 自动周报 | 模板周报的数字全部能在 SQL 结果里找到；随机编造的一位小数至少 80% 被拦下 |
-| 演示额度 | 超出每日上限就拒绝；40 个线程同时调用，放行次数严格等于上限 |
-| 智能客服 | 检索命中正确条款 ≥ 90%；知识库外的问题直接转人工；规则法工单分类准确率 ≥ 90% |
-| 接口 | 设置 `API_TOKEN` 后，没带或带错 `X-API-Token` 请求头的调用返回 401 |
+| `DEEPSEEK_API_KEY` | 大模型密钥，AI 问数 / 周报 / 客服需要 |
+| `FEISHU_WEBHOOK` | 飞书群机器人地址，推送周报用（选填） |
+| `EMBEDDING_API_KEY` | 向量模型密钥，填了客服改用混合检索（选填） |
+| `DUCKDB_MEMORY_LIMIT` | DuckDB 可用内存，默认 4GB，内存小可调低 |
+| `API_TOKEN` | 给 n8n / Dify 用的接口口令（选填，建议设置） |
 
-**接口安全**：`启动接口.command` 默认只监听本机（127.0.0.1）。如果要让其他设备或容器里的 n8n 调用，
-先在 `.env` 设置 `API_TOKEN`，n8n 的 HTTP 节点里填同一个值作为 `X-API-Token` 请求头。
+### 其他常用命令
+
+```bash
+python ai/weekly_report.py --push              # 生成周报并推送飞书
+python eval/run_text2sql_eval.py               # AI 问数评测（23 道开发集）
+python eval/run_text2sql_eval.py --holdout     # AI 问数独立题评测（10 道）
+python eval/run_service_eval.py --llm          # 智能客服评测
+python eval/run_weekly_guard_demo.py --reuse   # 周报数字核对演示（随机篡改 500 次）
+uvicorn api.server:app --port 8000             # 给 n8n / Dify 调用的接口，默认只允许本机访问
+pip install -r requirements-dev.txt && pytest  # 运行全部测试（自动生成合成数据，不需要下载原始数据）
+```
+
+修改前端页面：
+
+```bash
+cd web && npm install --legacy-peer-deps && npm run dev   # 开发预览
+npm run build                                             # 重新生成 web/dist
+```
 
 ## 目录结构
 
 ```
-├── pipeline/            数据流水线：构建数仓、质量检查
-├── sql/                 分层建表 SQL（01 DWD → 05 ADS）
-├── web/                 网页看板（React + shadcn/ui，源码在 src/，构建好的 dist/ 已提交）
-├── ai/                  AI 能力：llm 调用、text2sql、weekly_report、rag、tickets
-├── api/                 FastAPI：web.py 给网页看板，server.py 给 n8n / Dify
-├── kb/                  客服知识库文档 + 模拟工单
-├── eval/                评测集与评测脚本
-├── tests/               自动化测试（pytest，合成数据，GitHub Actions 自动运行）
-├── workflows/           n8n 工作流（可直接导入）
-├── reports/             数据质量、评测报告、周报样例
-└── docs/                分析报告、学习地图、面试题、Dify 搭建说明
+├── pipeline/   数据流水线：构建数仓、质量检查、生成演示库
+├── sql/        分层建表 SQL（01 DWD → 05 ADS）
+├── web/        网页看板（React + shadcn/ui，源码在 src/，构建产物 dist/ 已提交）
+├── api/        FastAPI：web.py 给网页看板，server.py 给 n8n / Dify
+├── ai/         AI 能力：llm、text2sql、weekly_report、rag、tickets
+├── kb/         客服知识库文档 + 模拟工单
+├── eval/       评测集与评测脚本
+├── tests/      自动化测试（pytest，GitHub Actions 自动运行）
+├── workflows/  n8n 工作流（可直接导入）
+├── deploy/     在线演示的服务器部署脚本
+├── reports/    数据质量、评测报告、周报样例
+└── docs/       分析报告、Dify 搭建说明等文档
 ```
-
-## 主要分析结论
-
-详见 [分析报告](docs/analysis_report.md)。
-
-1. **转化口径差异巨大**：次数口径浏览→购买只有 2.2%，用户口径 61% 的浏览用户 9 天内完成购买。看“流量效率”和看“用户最终是否购买”要用不同口径。
-2. **加购是最关键的购买前动作**：79% 的购买用户加购过商品，“加购未购买”人群是最直接的转化抓手。
-3. **头部用户贡献大部分成交**：重要价值客户占付费用户 28.7%，贡献 56.9% 的 GMV。
-4. **12 月第一个周末流量放大 36%，但转化率没有同步提升**；留存数据在这两天出现异常跳升，判断为数据集抽样或大促预热造成，分析时予以剔除。
-5. **品类长尾明显**：9437 个品类中，527 个（5.6%）贡献了 80% 的 GMV；四象限找出“高流量低转化”的机会品类。
-
-## 局限与改进方向
-
-- 数据只有 9 天，无法分析月度趋势、长期留存和季节性；RFM 只能用简化的高/低两档。
-- 价格为模拟，金额类结论只代表方法。
-- AI 问数依赖语义层说明，遇到复杂多表问题仍可能出错；下一步可以加入“相似问题 + SQL 示例”检索（few-shot）提高准确率。
-- AI 问数的 10 道独立题（`eval/text2sql_holdout.json`）由作者出题，出题后没有为这些题改过提示词和语义层（`ai/` 目录最后一次改动早于出题提交，可用 git 记录核对）；但只有 10 题，10/10 的统计意义有限（95% 置信区间下限约 69%），其中 1 题靠自动重试修正。后续计划再出第二批更难的题。
-- 智能客服的同义词表和规则分类基线是在评测集上调的，结果偏乐观；需要更多真实工单做独立测试集。
-- 周报数字核对是“在数据里找得到”的检查：编造的数字如果恰好和数据里某个数相同就拦不住；模型自己算的合理派生数（例如两数之差）会被标记，需要人工确认。
