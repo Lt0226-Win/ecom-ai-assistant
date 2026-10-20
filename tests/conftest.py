@@ -62,6 +62,7 @@ def warehouse(tmp_path_factory):
     mp.setattr(config, "ODS_PARQUET", tmp / "ods_user_behavior.parquet")
     mp.setattr(config, "DB_PATH", tmp / "test.duckdb")
     mp.setattr(config, "REPORT_DIR", tmp / "reports")
+    mp.setattr(config, "LOG_DIR", tmp / "logs")      # 测试产生的运行日志不写进项目的 data/logs
     mp.setattr(config, "DUCKDB_MEMORY_LIMIT", "1GB")
     mp.setattr(config, "DEEPSEEK_API_KEY", "")      # 测试不调用大模型
     mp.setattr(config, "EMBEDDING_API_KEY", "")

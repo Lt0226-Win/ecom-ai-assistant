@@ -53,7 +53,10 @@ def _client():
     if not available():
         raise LLMNotConfigured("没有配置 DEEPSEEK_API_KEY，请在项目根目录的 .env 文件里填写。")
     from openai import OpenAI
-    return OpenAI(api_key=config.DEEPSEEK_API_KEY, base_url=config.DEEPSEEK_BASE_URL, timeout=60)
+    # openai 库自带重试：超时、断网、限流（429）、服务器出错（5xx）都会自动再试，默认试 2 次。
+    # 网页上最坏要等“60 秒 × 3 次 = 3 分钟”，太久，所以改成只重试 1 次。
+    # 超时保持 60 秒：周报要写 1500 token 左右，DeepSeek 慢的时候 30 秒写不完。
+    return OpenAI(api_key=config.DEEPSEEK_API_KEY, base_url=config.DEEPSEEK_BASE_URL, timeout=60, max_retries=1)
 
 
 def chat(messages: list[dict], temperature: float = 0.0, json_mode: bool = False, max_tokens: int = 1500) -> str:

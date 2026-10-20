@@ -53,8 +53,14 @@ EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3")
 API_TOKEN = os.getenv("API_TOKEN", "")
 
 DEMO_MODE = os.getenv("DEMO_MODE", "0") == "1"
-DEMO_DAILY_LIMIT = int(os.getenv("DEMO_DAILY_LIMIT", "0"))   # 每天最多调用大模型多少次，0 = 不限制
+DEMO_DAILY_LIMIT = int(os.getenv("DEMO_DAILY_LIMIT", "0"))   # 全站每天最多调用大模型多少次，0 = 不限制
 USAGE_FILE = ROOT / "data" / "llm_usage.json"
+# 每个 IP 的 AI 请求上限（见 api/demo_guard.py）。演示版默认每分钟 5 次、每天 15 次；本地运行默认不限制（0）
+DEMO_IP_PER_MINUTE = int(os.getenv("DEMO_IP_PER_MINUTE", "5" if DEMO_MODE else "0"))
+DEMO_IP_DAILY_LIMIT = int(os.getenv("DEMO_IP_DAILY_LIMIT", "15" if DEMO_MODE else "0"))
+
+# ---------- 运行日志 ----------
+LOG_DIR = Path(os.getenv("LOG_DIR", str(ROOT / "data" / "logs")))   # data/ 不提交到 Git
 
 # ---------- 飞书群机器人 ----------
 FEISHU_WEBHOOK = os.getenv("FEISHU_WEBHOOK", "")

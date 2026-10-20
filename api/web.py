@@ -5,27 +5,37 @@
 
 和 api/server.py 的区别：
   - server.py 给 n8n、Dify 这类“系统”调用，默认只监听本机，并且要口令（X-API-Token）。
-  - web.py 给“浏览器里的页面”调用，没有口令（口令放在网页里等于公开），
-    所以防刷靠两条：DEMO_DAILY_LIMIT（每天大模型调用上限）+ SQL 只读检查。
-    不要把没有设置 DEMO_DAILY_LIMIT 的 web.py 直接暴露到公网。
+  - web.py 给“浏览器里的页面”调用，没有口令（口令放在网页里等于公开），所以靠下面几条防护：
+      · DEMO_DAILY_LIMIT：全站每天大模型调用上限
+      · 每个 IP 每分钟 / 每天的次数上限，周报同一份数据只生成一次（见 api/demo_guard.py）
+      · 问题和对话记录的长度上限；网页传回来的历史 SQL 也要重新过一遍安全检查（防止伪造对话记录）
+      · SQL 安全检查 + 只读连接禁止读文件（见 ai/text2sql.py、pipeline/db.py）
+    不要把没有设置 DEMO_MODE=1 和 DEMO_DAILY_LIMIT 的 web.py 直接暴露到公网。
 """
 import json
 import math
 import os
 import re
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from fastapi import APIRouter, FastAPI, HTTPException  # noqa: E402
+from fastapi import APIRouter, FastAPI, HTTPException, Request  # noqa: E402
 from fastapi.responses import JSONResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
 import config  # noqa: E402
 from ai import llm, rag, text2sql, tickets, weekly_report  # noqa: E402
+from api.demo_guard import cached_llm_report, check_ip_limit, log_event  # noqa: E402
 from pipeline.db import connect, new_cursor  # noqa: E402
+
+MAX_QUESTION_CHARS = 300        # 问题最长多少字
+MAX_TICKET_CHARS = 500          # 工单最长多少字
+MAX_HISTORY_CHARS = 500         # 对话记录里每段文字最多保留多少字（超出部分截掉）
+MAX_BODY_BYTES = 32 * 1024      # 一次请求最大 32KB（正常提问加两轮对话记录只有几 KB）
 
 DIST = config.ROOT / "web" / "dist"
 EXAMPLES = ["哪一天的GMV最高？", "复购率是多少？", "GMV排名前5的品类是哪些？",
@@ -96,6 +106,35 @@ class ReportIn(BaseModel):
 api = APIRouter(prefix="/api")
 
 
+def _check_text(text: str, limit: int, what: str) -> str:
+    text = text.strip()
+    if not text:
+        raise HTTPException(400, f"{what}不能为空")
+    if len(text) > limit:
+        raise HTTPException(400, f"{what}太长了，请控制在 {limit} 字以内")
+    return text
+
+
+def _cut(v) -> str:
+    return str(v or "")[:MAX_HISTORY_CHARS]
+
+
+def _ask_history(items: list[dict]) -> list[dict]:
+    """网页传回来的问数对话记录：只用最近 2 轮，每段截断；SQL 必须重新通过安全检查，否则丢掉。
+    对话记录是浏览器发来的，别人可以伪造一段“AI 之前写过的 SQL”来诱导模型照着写，所以不能直接相信。"""
+    out = []
+    for h in items[-2:]:
+        sql = str(h.get("sql") or "")[:2000]
+        try:
+            sql = text2sql.check_sql(sql) if sql.strip() else ""
+        except text2sql.UnsafeSQL:
+            sql = ""
+        out += [{"role": "user", "content": _cut(h.get("q"))},
+                {"role": "assistant", "content": json.dumps({"sql": sql, "explanation": _cut(h.get("explanation"))},
+                                                            ensure_ascii=False)}]
+    return out
+
+
 def _accuracy(name: str):
     p = config.REPORT_DIR / name
     if p.exists():
@@ -114,10 +153,9 @@ def status():
 
 
 @api.post("/ask")
-def ask(q: AskIn):
-    question = q.question.strip()
-    if not question:
-        raise HTTPException(400, "问题不能为空")
+def ask(q: AskIn, request: Request):
+    question = _check_text(q.question, MAX_QUESTION_CHARS, "问题")
+    t0 = time.time()
     cur = con()
     if not llm.available():
         # 演示模式：没有配置大模型时，只支持评测题里的示例问题（用标准 SQL 展示页面效果）
@@ -130,48 +168,62 @@ def ask(q: AskIn):
         ans.data = text2sql.run_sql(cur, gold[question])
         ans.trace = [{"sql": ans.sql, "error": ""}]
     else:
-        history = []
-        for h in q.history[-2:]:
-            history += [{"role": "user", "content": str(h.get("q", ""))},
-                        {"role": "assistant", "content": json.dumps({"sql": h.get("sql", ""),
-                                                                     "explanation": h.get("explanation", "")},
-                                                                    ensure_ascii=False)}]
-        ans = text2sql.ask(cur, question, history=history)
+        check_ip_limit(request, "ask")
+        ans = text2sql.ask(cur, question, history=_ask_history(q.history))
+    log_event("ask", question=question, sql=ans.sql, ok=not ans.error, error=ans.error,
+              blocked=ans.error.startswith("安全检查未通过"), attempts=ans.attempts, seconds=time.time() - t0)
     return {"question": ans.question, "sql": ans.sql, "explanation": ans.explanation, "summary": ans.summary,
             "error": ans.error, "attempts": ans.attempts, "seconds": round(ans.seconds, 1), "trace": ans.trace,
             "table": None if ans.data is None else _table(ans.data)}
 
 
 @api.post("/report")
-def report(r: ReportIn):
+def report(r: ReportIn, request: Request):
     # 只生成、不落盘：公开接口不往服务器写文件（定时周报的存档由 ai/weekly_report.py 负责）
-    rep = weekly_report.generate(con(), use_llm=r.use_llm and llm.available())
+    t0, cur = time.time(), con()
+    if r.use_llm and llm.available():
+        # 同一份数据只让大模型写一次，之后直接返回缓存；只有真正要调用大模型时才计入 IP 次数
+        rep, cached = cached_llm_report(lambda: weekly_report.generate(cur, use_llm=True),
+                                        on_miss=lambda: check_ip_limit(request, "report"))
+    else:
+        rep, cached = weekly_report.generate(cur, use_llm=False), False
+    log_event("report", source=rep["source"], cached=cached, unverified=len(rep["unverified_numbers"]),
+              ok=not rep["error"], error=rep["error"], seconds=time.time() - t0)
     return {"title": rep["title"], "markdown": rep["markdown"], "source": rep["source"],
-            "unverified_numbers": rep["unverified_numbers"], "error": rep["error"], "facts": rep["facts"]}
+            "unverified_numbers": rep["unverified_numbers"], "error": rep["error"], "facts": rep["facts"],
+            "cached": cached, "generated_at": rep.get("generated_at", "")}
 
 
 @api.post("/service/answer")
-def service_answer(q: ServiceIn):
+def service_answer(q: ServiceIn, request: Request):
+    question = _check_text(q.question, MAX_QUESTION_CHARS, "问题")
+    t0 = time.time()
+    if llm.available():
+        check_ip_limit(request, "service")
     hist = []
     for it in q.history[-2:]:
-        hist += [{"role": "user", "content": str(it.get("question", ""))},
-                 {"role": "assistant", "content": str(it.get("answer", ""))}]
-    res = rag.answer(q.question.strip(), history=hist)
+        hist += [{"role": "user", "content": _cut(it.get("question"))},
+                 {"role": "assistant", "content": _cut(it.get("answer"))}]
+    res = rag.answer(question, history=hist)
     res["no_answer_score"] = rag.NO_ANSWER_SCORE
+    log_event("service", question=question, need_human=res["need_human"], top_score=res["top_score"],
+              ok=not res["error"], error=res["error"], seconds=time.time() - t0)
     return res
 
 
 @api.post("/tickets/classify")
-def classify_ticket(t: TicketIn):
-    text = t.text.strip()
-    if not text:
-        raise HTTPException(400, "工单内容不能为空")
+def classify_ticket(t: TicketIn, request: Request):
+    text = _check_text(t.text, MAX_TICKET_CHARS, "工单内容")
+    t0 = time.time()
     out = {"rule": tickets.classify_rule(text)["category"], "llm": None, "error": ""}
     if llm.available():
+        check_ip_limit(request, "ticket")
         try:
             out["llm"] = tickets.classify_llm(text)
         except Exception as e:  # noqa: BLE001
             out["error"] = f"调用大模型失败：{e}"
+    log_event("ticket", text=text, rule=out["rule"], llm=(out["llm"] or {}).get("category", ""),
+              ok=not out["error"], error=out["error"], seconds=time.time() - t0)
     return out
 
 
@@ -192,6 +244,18 @@ def tickets_batch():
 
 def build_site() -> FastAPI:
     site = FastAPI(title="电商 AI 运营助手 · 看板")
+
+    @site.middleware("http")
+    async def limit_body_size(request: Request, call_next):
+        """超大的请求直接拒绝，不让它进到后面的解析和大模型调用"""
+        try:
+            size = int(request.headers.get("content-length") or 0)
+        except ValueError:
+            size = 0
+        if size > MAX_BODY_BYTES:
+            return JSONResponse({"detail": "请求内容太大"}, status_code=413)
+        return await call_next(request)
+
     site.include_router(api)
     if DIST.exists():
         site.mount("/", StaticFiles(directory=DIST, html=True), name="web")

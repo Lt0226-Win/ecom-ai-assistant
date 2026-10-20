@@ -37,6 +37,7 @@ export type AskAnswer = {
 }
 export type ReportResult = {
   title: string; markdown: string; source: string; unverified_numbers: string[]; error: string; facts: unknown
+  cached?: boolean; generated_at?: string
 }
 export type ServiceResult = {
   question: string; answer: string; need_human: boolean; error: string; mode: string; top_score: number

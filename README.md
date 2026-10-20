@@ -29,7 +29,7 @@
 ### 2. AI 问数（Text-to-SQL）
 
 - 用中文提问 → 大模型根据语义层说明写 SQL → **只读安全检查后执行** → 报错时把错误发回模型自动修正（最多重试 2 次）→ 用中文总结结论。
-- 安全措施：只放行单条 `SELECT` / `WITH` 查询，只读连接，查询超时自动中断，最多返回 500 行。
+- 安全措施：只放行单条 `SELECT` / `WITH` 查询；只读连接，并关闭读文件和联网（防止 AI 被诱导读取服务器上的文件）；查询超时自动中断，最多返回 500 行。在线演示另有每个 IP 的次数限制、输入长度限制和运行日志（见 `api/demo_guard.py`）。
 - 效果：开发集 23 道题准确率 95.7%；另有 10 道未参与调优的独立题 10/10（样本较小，仅作初步验证）。见 [开发集报告](reports/text2sql_eval.md)、[独立题报告](reports/text2sql_holdout.md)。
 
 ### 3. 自动周报
@@ -103,7 +103,7 @@ uvicorn api.web:app --port 8600       # 启动看板（网页 + 接口），打�
 | `FEISHU_WEBHOOK` | 飞书群机器人地址，推送周报用（选填） |
 | `EMBEDDING_API_KEY` | 向量模型密钥，填了客服改用混合检索（选填） |
 | `DUCKDB_MEMORY_LIMIT` | DuckDB 可用内存，默认 4GB，内存小可调低 |
-| `API_TOKEN` | 给 n8n / Dify 用的接口口令（选填，建议设置） |
+| `API_TOKEN` | 给 n8n / Dify 用的接口口令（选填；不设时接口只接受本机调用） |
 
 ### 其他常用命令
 
@@ -120,8 +120,8 @@ pip install -r requirements-dev.txt && pytest  # 运行全部测试（自动生�
 修改前端页面：
 
 ```bash
-cd web && npm install --legacy-peer-deps && npm run dev   # 开发预览
-npm run build                                             # 重新生成 web/dist
+cd web && npm ci --legacy-peer-deps && npm run dev   # 开发预览
+rm -rf dist && npm run build                         # 重新生成 web/dist（先删旧的，原因见 web/README.md）
 ```
 
 ## 目录结构

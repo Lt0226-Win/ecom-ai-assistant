@@ -11,12 +11,15 @@
 不要用 `python3 -m http.server` 打开：它只有静态文件，AI 三页会连不上接口。
 
 ## 修改页面和重新构建（需要 Node 20+）
-    cd web && npm install --legacy-peer-deps && npm run dev      # 开发预览
-    npm run build                                                 # 生成 dist/（已提交到仓库，服务器不用装 Node）
+    cd web && npm ci --legacy-peer-deps && npm run dev     # 开发预览（npm ci 按 package-lock.json 装固定版本）
+    rm -rf dist && npm run build                           # 生成 dist/（已提交到仓库，服务器不用装 Node）
+
+为什么构建前要先删 dist：Tailwind 会扫描 web/ 下所有文件找用到的样式类，旧的 dist 里那份打包好的 JS 也会被扫进去，
+CSS 会无缘无故变大（实测 76KB → 90KB）。先删掉再构建，同样的源码每次构建结果逐字节一致。
 
 ## 更新数据
     python tools/export_dashboard_data.py     # 从数仓导出 web/public/data/*.json
-    cd web && npm run build                   # 再构建一次，dist/data 才会更新
+    cd web && rm -rf dist && npm run build    # 再构建一次，dist/data 才会更新
 
 ## 改颜色
 - 涨跌颜色（红涨绿跌）、图表颜色：`src/index.css` 里的 `--up` / `--down` / `--chart-1…5`

@@ -61,10 +61,13 @@ SUMMARY_PROMPT = """用户问题：{question}
 数字写法：超过 1 万的数用“万”表示并保留 1 位小数（例如 4198.5 万元）；0-1 之间的比率换成百分比（例如 0.5507 写成 55.1%）。
 如果涉及金额，提醒“金额基于模拟价格”。不要编造结果里没有的数字。"""
 
+# 第一道防线：禁用词名单。名单总有漏网的写法（例如 sniff_csv、read_ndjson，或者把语句藏进 query('...') 的字符串里），
+# 所以真正兜底的是第二道防线：只读连接关掉了读文件和访问网络（见 pipeline/db.py）。
 FORBIDDEN = re.compile(
     r"\b(insert|update|delete|drop|create|alter|truncate|copy|attach|detach|install|load|pragma|set|reset|"
     r"export|import|call|checkpoint|vacuum|grant|revoke|use)\b"
-    r"|read_csv|read_parquet|read_json|read_text|read_blob|glob\s*\(|parquet_scan|httpfs|getenv",
+    r"|read_csv|read_parquet|read_json|read_text|read_blob|glob\s*\(|parquet_scan|httpfs|getenv"
+    r"|\bread_\w*\s*\(|\bsniff_csv\b|\bparquet_\w+\s*\(|\w+_scan\s*\(|\bquery(_table)?\s*\(",
     re.I)
 
 

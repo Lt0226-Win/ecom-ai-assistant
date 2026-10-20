@@ -67,7 +67,10 @@ export function ReportPage() {
           <Card>
             <CardHeader>
               <CardTitle>{rep.title}</CardTitle>
-              <CardDescription>{rep.source === "llm" ? "大模型生成" : "模板生成"}</CardDescription>
+              <CardDescription>
+                {rep.source === "llm" ? "大模型生成" : "模板生成"}
+                {rep.cached && `（数据没变，显示的是 ${rep.generated_at} 生成的同一份周报，不重复调用大模型）`}
+              </CardDescription>
             </CardHeader>
             <CardContent><Prose md={rep.markdown.split("\n").slice(1).join("\n")} /></CardContent>
           </Card>

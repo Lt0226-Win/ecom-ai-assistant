@@ -100,9 +100,10 @@ function KnowledgeQA({ status }: { status: Status }) {
         </Card>
       ))}
       <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); ask(text) }}>
-        <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="像顾客一样提问，例如：退款退到银行卡要多久？" disabled={busy} />
+        <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="像顾客一样提问，例如：退款退到银行卡要多久？" disabled={busy} maxLength={300} />
         <Button type="submit" disabled={busy || !text.trim()}><IconSend />发送</Button>
       </form>
+      {status.demo && <p className="text-xs text-muted-foreground">为了改进效果，提问内容会匿名记录（不记录 IP）。</p>}
     </div>
   )
 }
@@ -132,10 +133,13 @@ function TicketClassify({ status }: { status: Status }) {
       <Card className="shadow-xs">
         <CardHeader>
           <CardTitle className="text-base">给一条工单自动分类</CardTitle>
-          <CardDescription>粘贴一条顾客留言，系统判断它属于哪一类问题。规则版按关键词判断，大模型版还能给出紧急程度和情绪。</CardDescription>
+          <CardDescription>
+            粘贴一条顾客留言，系统判断它属于哪一类问题。规则版按关键词判断，大模型版还能给出紧急程度和情绪。
+            {status.demo && "在线体验时，输入内容会匿名记录（不记录 IP）。"}
+          </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          <Textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="例如：收到的衣服有一股怪味，想退货" rows={3} />
+          <Textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="例如：收到的衣服有一股怪味，想退货" rows={3} maxLength={500} />
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={() => run(text)} disabled={busy || !text.trim()}>{busy ? "正在分类…" : "分类"}</Button>
             {samples.map((s) => (

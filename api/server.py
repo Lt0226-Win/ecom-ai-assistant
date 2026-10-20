@@ -5,6 +5,7 @@
 
 安全：在 .env 里设置 API_TOKEN 后，除 /health 外的接口都要在请求头带上 X-API-Token: <口令>，
 否则返回 401。这样即使接口暴露在局域网里，别人也调不了、刷不了你的大模型额度。
+没有设置 API_TOKEN 时，只接受本机（127.0.0.1）的请求，其他设备（包括 Docker 里的 n8n）一律返回 403。
 
 为什么要有接口：看板是给人用的，接口是给“其他系统”用的。
 例如 n8n 每周一 9 点调用 /report/weekly 拿到周报，再推送到飞书；
@@ -15,7 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from fastapi import Depends, FastAPI, Header, HTTPException  # noqa: E402
+from fastapi import Depends, FastAPI, Header, HTTPException, Request  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
 import config  # noqa: E402
@@ -36,10 +37,16 @@ def con():
     return new_cursor(_con)
 
 
-def check_token(x_api_token: str | None = Header(default=None)) -> None:
-    """设置了 API_TOKEN 时，校验请求头里的口令"""
-    if config.API_TOKEN and x_api_token != config.API_TOKEN:
-        raise HTTPException(401, "缺少或错误的 X-API-Token")
+LOCAL_HOSTS = {"127.0.0.1", "::1", "localhost"}
+
+
+def check_token(request: Request, x_api_token: str | None = Header(default=None)) -> None:
+    """设置了 API_TOKEN 时校验口令；没设置时只允许本机调用（防止忘了设口令就把接口开放出去）"""
+    if config.API_TOKEN:
+        if x_api_token != config.API_TOKEN:
+            raise HTTPException(401, "缺少或错误的 X-API-Token")
+    elif (request.client.host if request.client else "") not in LOCAL_HOSTS:
+        raise HTTPException(403, "没有设置 API_TOKEN 时只允许本机调用。要给其他设备或 Docker 里的 n8n 用，请先在 .env 设置 API_TOKEN")
 
 
 protected = [Depends(check_token)]

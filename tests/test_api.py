@@ -28,8 +28,13 @@ def test_accepts_correct_token(client):
     assert r.json()["period"]["end"] == "2017-12-03"
 
 
-def test_no_token_configured_means_open(warehouse, monkeypatch):
+def test_no_token_configured_allows_local_only(warehouse, monkeypatch):
+    """没设口令时：本机可以调用；其他设备（包括 Docker 里的 n8n）被拒绝，防止忘了设口令就把接口开放出去"""
     from api import server
     monkeypatch.setattr(server, "_con", None)
     monkeypatch.setattr(config, "API_TOKEN", "")
-    assert TestClient(server.app).get("/metrics/weekly").status_code == 200
+    local = TestClient(server.app, client=("127.0.0.1", 50000))
+    remote = TestClient(server.app, client=("192.168.65.2", 50000))
+    assert local.get("/metrics/weekly").status_code == 200
+    assert remote.get("/metrics/weekly").status_code == 403
+    assert remote.get("/health").status_code == 200

@@ -103,6 +103,7 @@ export function AskPage() {
                 {status.eval_holdout && <> 另有 {status.eval_holdout.total} 道调优时没见过的独立题，答对 {status.eval_holdout.correct} 道（样本小，仅作泛化的初步验证）。</>}
                 {status.llm ? ` 当前模型：${status.model}。` : " 当前没有配置大模型，是演示模式：只能回答下面的示例问题，用预先写好的标准 SQL 展示页面效果。"}
                 {status.demo && status.daily_limit > 0 && ` 在线体验每天限 ${status.daily_limit} 次 AI 调用。`}
+                {status.demo && " 为了改进效果，提问内容会匿名记录（不记录 IP）。"}
               </CardDescription>
             </CardHeader>
           </Card>
@@ -129,7 +130,7 @@ export function AskPage() {
           </Card>
         ))}
         <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); ask(text) }}>
-          <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="用中文提问，例如：12月1日的付费用户比11月30日多多少？" disabled={busy || !!fatal} />
+          <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="用中文提问，例如：12月1日的付费用户比11月30日多多少？" disabled={busy || !!fatal} maxLength={300} />
           <Button type="submit" disabled={busy || !text.trim() || !!fatal}><IconSend />提问</Button>
         </form>
       </Section>
